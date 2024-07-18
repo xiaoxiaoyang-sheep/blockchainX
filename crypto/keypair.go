@@ -37,8 +37,8 @@ func (k *PrivateKey) Sign(data []byte) (*Signature, error) {
 	}, nil
 }
 
-func (k *PrivateKey) PublicKey() *PublicKey {
-	return &PublicKey{
+func (k *PrivateKey) PublicKey() PublicKey {
+	return PublicKey{
 		key: &k.key.PublicKey,
 	}
 }
@@ -61,6 +61,6 @@ type Signature struct {
 	r, s *big.Int
 }
 
-func (sig *Signature) Verify(pubKey *PublicKey, data []byte) bool {
+func (sig *Signature) Verify(pubKey PublicKey, data []byte) bool {
 	return ecdsa.Verify(pubKey.key, data, sig.r, sig.s)
 }
