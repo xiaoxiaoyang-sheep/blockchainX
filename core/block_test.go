@@ -24,6 +24,13 @@ func RandomBlock(height uint32) *Block {
 	return NewBlock(header, []Transaction{tx})
 }
 
+func RandomBlockWithSignature(t *testing.T, height uint32) *Block {
+	privKey := crypto.GeneratePrivateKey()
+	b := RandomBlock(height)
+	assert.Nil(t, b.Sign(privKey))
+	return b
+}
+
 func TestSignBlock(t *testing.T) {
 	privKey := crypto.GeneratePrivateKey()
 	b := RandomBlock(0)
@@ -37,9 +44,6 @@ func TestVerifyBlock(t *testing.T) {
 	b := RandomBlock(0)
 
 	assert.Nil(t, b.Sign(privKey))
-	assert.Nil(t, b.Verify())
-
-	b.Height = 0
 	assert.Nil(t, b.Verify())
 
 	otherPrivKey := crypto.GeneratePrivateKey()

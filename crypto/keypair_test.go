@@ -18,6 +18,7 @@ func TestKeypairSignVerifySuccess(t *testing.T) {
 }
 
 func TestKeypairSignVerifyFail(t *testing.T) {
+
 	privKey := GeneratePrivateKey()
 	pubKey := privKey.PublicKey()
 	msg := []byte("hello world")

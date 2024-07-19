@@ -79,5 +79,6 @@ func (b *Block) HeaderData() []byte {
 	enc := gob.NewEncoder(buf)
 	enc.Encode(b.Header)
 
+	fmt.Println(buf.Bytes())
 	return buf.Bytes()
 }
