@@ -2,9 +2,10 @@ package core
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/gob"
 	"fmt"
-	"io"
+	"time"
 
 	"github.com/xiaoxiaoyang-sheep/blockchainX/crypto"
 	"github.com/xiaoxiaoyang-sheep/blockchainX/types"
@@ -36,11 +37,28 @@ type Block struct {
 	hash types.Hash
 }
 
-func NewBlock(h *Header, txx []*Transaction) *Block {
+func NewBlock(h *Header, txx []*Transaction) (*Block, error) {
 	return &Block{
 		Header:       h,
 		Transactions: txx,
+	}, nil
+}
+
+func NewBlockFromPrevHeader(prevHeader *Header, txx []*Transaction) (*Block, error) {
+	datahash, err := CalculateDataHash(txx)
+	if err != nil {
+		return nil, err
 	}
+
+	header := &Header{
+		Version:       1,
+		Height:        prevHeader.Height + 1,
+		DataHash:      datahash,
+		PrevBlockHash: BlockHasher{}.Hash(prevHeader),
+		Timestamp:     time.Now().UnixNano(),
+	}
+
+	return NewBlock(header, txx)
 }
 
 func (b *Block) AddTransaction(tx *Transaction) {
@@ -74,15 +92,23 @@ func (b *Block) Verify() error {
 		}
 	}
 
+	datahash, err := CalculateDataHash(b.Transactions)
+	if err != nil {
+		return nil
+	}
+	if datahash != b.DataHash {
+		return fmt.Errorf("block (%s) has a invalid data hash", b.Hash(BlockHasher{}))
+	}
+
 	return nil
 }
 
-func (b *Block) Decode(r io.Reader, dec Decoder[*Block]) error {
-	return dec.Decoder(r, b)
+func (b *Block) Decode(dec Decoder[*Block]) error {
+	return dec.Decode(b)
 }
 
-func (b *Block) Encode(w io.Writer, enc Encoder[*Block]) error {
-	return enc.Encoder(w, b)
+func (b *Block) Encode(enc Encoder[*Block]) error {
+	return enc.Encode(b)
 }
 
 func (b *Block) Hash(hasher Hasher[*Header]) types.Hash {
@@ -90,4 +116,17 @@ func (b *Block) Hash(hasher Hasher[*Header]) types.Hash {
 		b.hash = hasher.Hash(b.Header)
 	}
 	return b.hash
+}
+
+func CalculateDataHash(txx []*Transaction) (hash types.Hash, err error) {
+	buf := &bytes.Buffer{}
+
+	for _, tx := range txx {
+		if err = tx.Encode(NewGobTxEncoder(buf)); err != nil {
+			return
+		}
+	}
+
+	hash = sha256.Sum256(buf.Bytes())
+	return
 }

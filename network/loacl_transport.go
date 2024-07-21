@@ -1,6 +1,7 @@
 package network
 
 import (
+	"bytes"
 	"fmt"
 	"sync"
 )
@@ -8,19 +9,19 @@ import (
 type LocalTransport struct {
 	lock      sync.RWMutex
 	addr      NetAddr
-	consumeCh chan Rpc
+	consumeCh chan RPC
 	peers     map[NetAddr]*LocalTransport
 }
 
 func NewLocalTransport(addr NetAddr) Transport {
 	return &LocalTransport{
 		addr:      addr,
-		consumeCh: make(chan Rpc, 1024),
+		consumeCh: make(chan RPC, 1024),
 		peers:     make(map[NetAddr]*LocalTransport),
 	}
 }
 
-func (t *LocalTransport) Consume() <-chan Rpc {
+func (t *LocalTransport) Consume() <-chan RPC {
 	return t.consumeCh
 }
 
@@ -39,14 +40,23 @@ func (t *LocalTransport) SendMessage(to NetAddr, payload []byte) error {
 
 	peer, ok := t.peers[to]
 	if !ok {
-		return fmt.Errorf("%s: canld not send message to %s", t.addr, to)
+		return fmt.Errorf("%s: canld not send message to unknown peer %s", t.addr, to)
 	}
 
-	peer.consumeCh <- Rpc{
+	peer.consumeCh <- RPC{
 		From:    t.addr,
-		Payload: payload,
+		Payload: bytes.NewReader(payload),
 	}
 
+	return nil
+}
+
+func (t *LocalTransport) Broadcast(payload []byte) error {
+	for _, peer := range t.peers {
+		if err := t.SendMessage(peer.addr, payload); err != nil {
+			return nil
+		}
+	}
 	return nil
 }
 

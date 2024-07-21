@@ -13,8 +13,11 @@ func AddressFromBytes(b []byte) Address {
 		panic(msg)
 	}
 
-	value := make([]uint8, 20)
-	copy(value, b[:])
+	var value [20]uint8
+
+	for i := 0; i < 20; i++ {
+		value[i] = b[i]
+	}
 
 	return Address(value)
 }

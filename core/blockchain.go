@@ -2,20 +2,24 @@ package core
 
 import (
 	"fmt"
+	"sync"
 
-	"github.com/sirupsen/logrus"
+	"github.com/go-kit/log"
 )
 
 type Blockchain struct {
+	logger    log.Logger
+	lock      sync.RWMutex
 	storage   Storage
 	headers   []*Header
 	validator Validator
 }
 
-func NewBlockchain(genesis *Block) (*Blockchain, error) {
+func NewBlockchain(l log.Logger, genesis *Block) (*Blockchain, error) {
 	bc := &Blockchain{
 		headers: []*Header{},
 		storage: NewMemorystorage(),
+		logger:  l,
 	}
 
 	bc.validator = NewBlockValidator(bc)
@@ -42,6 +46,9 @@ func (bc *Blockchain) GetHeader(height uint32) (*Header, error) {
 		return nil, fmt.Errorf("given height (%d) too high", height)
 	}
 
+	bc.lock.Lock()
+	defer bc.lock.Unlock()
+
 	return bc.headers[height], nil
 }
 
@@ -50,16 +57,24 @@ func (bc *Blockchain) HasBlock(height uint32) bool {
 }
 
 func (bc *Blockchain) Height() uint32 {
+	bc.lock.RLock()
+	defer bc.lock.RUnlock()
+
 	return uint32(len(bc.headers) - 1)
 }
 
 func (bc *Blockchain) addBlockWithoutValidation(b *Block) error {
-	bc.headers = append(bc.headers, b.Header)
 
-	logrus.WithFields(logrus.Fields{
-		"height": b.Height,
-		"hash":   b.Hash(BlockHasher{}),
-	}).Info("add new block")
+	bc.lock.Lock()
+	bc.headers = append(bc.headers, b.Header)
+	bc.lock.Unlock()
+
+	bc.logger.Log(
+		"msg", "new block",
+		"hash", b.Hash(BlockHasher{}),
+		"height", b.Height,
+		"transactions", len(b.Transactions),
+	)
 
 	return bc.storage.Put(b)
 }
