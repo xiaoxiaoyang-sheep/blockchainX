@@ -13,13 +13,16 @@ type Blockchain struct {
 	storage   Storage
 	headers   []*Header
 	validator Validator
+	// TODO:  make this on interface
+	contractState *State
 }
 
 func NewBlockchain(l log.Logger, genesis *Block) (*Blockchain, error) {
 	bc := &Blockchain{
-		headers: []*Header{},
-		storage: NewMemorystorage(),
-		logger:  l,
+		contractState: NewState(),
+		headers:       []*Header{},
+		storage:       NewMemorystorage(),
+		logger:        l,
 	}
 
 	bc.validator = NewBlockValidator(bc)
@@ -41,11 +44,11 @@ func (bc *Blockchain) AddBlock(b *Block) error {
 	for _, tx := range b.Transactions {
 		bc.logger.Log("msg", "executing code", "len", len(tx.Date), "hash", tx.Hash(TxHasher{}))
 
-		vm := NewVM(tx.Date)
+		vm := NewVM(tx.Date, bc.contractState)
 		if err := vm.Run(); err != nil {
 			return err
 		}
-		bc.logger.Log("vm result", vm.stack.Pop())
+		fmt.Printf("STATE: %+v\n", bc.contractState.data)
 	}
 
 	return bc.addBlockWithoutValidation(b)

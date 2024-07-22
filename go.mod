@@ -1,11 +1,11 @@
 module github.com/xiaoxiaoyang-sheep/blockchainX
 
-go 1.20
+go 1.18
 
 require github.com/stretchr/testify v1.9.0
 
 require (
-	github.com/go-kit/log v0.2.1 // indirect
+	github.com/go-kit/log v0.2.1
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
 )
 
