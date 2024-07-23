@@ -2,6 +2,8 @@ package network
 
 import (
 	"bytes"
+	"encoding/gob"
+	"fmt"
 	"os"
 	"time"
 
@@ -15,6 +17,7 @@ var defaultBlockTime = 5 * time.Second
 
 type ServerOps struct {
 	ID             string
+	Transport      Transport
 	Logger         log.Logger
 	RPCDecodedFunc RPCDecodedFunc
 	RPCProcessor   RPCProcessor
@@ -69,6 +72,9 @@ func NewServer(opts ServerOps) (*Server, error) {
 		go s.validatorLoop()
 	}
 
+	// for _, tr := range s.Transports {
+	// 	s.sendGetStatusMessage(tr)
+	// }
 	return s, nil
 }
 
@@ -84,7 +90,9 @@ free:
 				s.Logger.Log("error", err)
 			}
 			if err := s.RPCProcessor.ProcessMessage(msg); err != nil {
-				s.Logger.Log("error", err)
+				if err := s.Logger.Log("error", err); err != nil {
+					s.Logger.Log("send get status error", err)
+				}
 			}
 		case <-s.quitCh:
 			break free
@@ -112,7 +120,28 @@ func (s *Server) ProcessMessage(msg *DecodedMessage) error {
 		return s.processTransaction(t)
 	case *core.Block:
 		return s.processBlock(t)
+	case *GetStatusMessage:
+		return s.processGetStatusMessage(msg.From, t)
+	case *StatusMessage:
+		return s.processStatusMessage(msg.From, t)
 	}
+	return nil
+}
+
+// TODO(@Yanko): Remoeve the logic from the main funciton to here
+// Normally Transport which is our own transport should do the trick
+func (s *Server) sendGetStatusMessage(tr Transport) error {
+	var (
+		getStatusMsg = new(GetStatusMessage)
+		buf          = new(bytes.Buffer)
+	)
+
+	if err := gob.NewEncoder(buf).Encode(getStatusMsg); err != nil {
+		return err
+	}
+
+	// msg := NewMessage(MessageTypeGetStatus, buf.Bytes())
+
 	return nil
 }
 
@@ -123,6 +152,30 @@ func (s *Server) broadcast(payload []byte) error {
 		}
 	}
 	return nil
+}
+
+func (s *Server) processStatusMessage(from NetAddr, data *StatusMessage) error {
+
+	fmt.Printf("received Getstatus response msg from %s => %+v\n", from, data)
+	return nil
+}
+
+func (s *Server) processGetStatusMessage(from NetAddr, data *GetStatusMessage) error {
+	fmt.Printf("received Getstatus msg from %s => %+v\n", from, data)
+
+	statusMessage := &StatusMessage{
+		CurrentHeight: s.chain.Height(),
+		ID:            s.ID,
+	}
+
+	buf := new(bytes.Buffer)
+	if err := gob.NewEncoder(buf).Encode(statusMessage); err != nil {
+		return err
+	}
+
+	msg := NewMessage(MessageTypeStatus, buf.Bytes())
+
+	return s.Transport.SendMessage(from, msg.Bytes())
 }
 
 func (s *Server) processBlock(b *core.Block) error {
